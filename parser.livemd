@@ -1,0 +1,82 @@
+# Rofl parser
+
+```elixir
+Mix.install([:jason, :kino])
+```
+
+## Section
+
+```elixir
+File.cwd!()
+```
+
+```elixir
+replay = File.read!("EUW1-7128452370.rofl")
+```
+
+## Prefix v2
+
+```elixir
+# RIOT
+expected_prefix = <<0x52, 0x49, 0x4F, 0x54, 0x02, 0x00>>
+```
+
+```elixir
+String.starts_with?(replay, expected_prefix)
+```
+
+## Read Metadata
+
+```elixir
+byte_size = byte_size(replay)
+last_four_byte = binary_part(replay, byte_size - 4, 4)
+<<metadata_size::little-32>> = last_four_byte
+metadata_size
+```
+
+```elixir
+byte_size
+```
+
+```elixir
+metadata = binary_part(replay, byte_size - metadata_size - 4, metadata_size)
+metadata = Jason.decode!(metadata)
+stats_json = Jason.decode!(metadata["statsJson"])
+Map.put(metadata, "statsJson", stats_json)
+|> Kino.Tree.new()
+```
+
+```elixir
+File.read!("metadata.json")
+|> Jason.decode!()
+```
+
+## Try to find headers length v2
+
+```elixir
+game_version = binary_part(replay, 4 + 11, 14)
+```
+
+```elixir
+test = binary_part(replay, 4 + 11 + 14, 17)
+:binary.decode_unsigned(test, :little)
+```
+
+## Old replay
+
+```elixir
+replay = File.read!("3-022.rofl")
+byte_size = byte_size(replay)
+last_four_byte = binary_part(replay, 288 - 4, 4)
+:binary.decode_unsigned(last_four_byte, :little)
+```
+
+```elixir
+metadata = binary_part(replay, 288, metadata_size)
+```
+
+```elixir
+chunk_data = binary_part(replay, 288 + metadata_size, 17)
+<<chunk_size::little-32>> = last_four_byte
+chunk_size
+```
