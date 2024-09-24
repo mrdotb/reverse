@@ -35,7 +35,7 @@ metadata_size
 ```
 
 ```elixir
-byte_size
+byte_size - metadata_size
 ```
 
 ```elixir
@@ -51,6 +51,82 @@ File.read!("metadata.json")
 |> Jason.decode!()
 ```
 
+## Parser replay
+
+```elixir
+defmodule W do
+  @header_size 6 + 9 + 14
+  @chunk_header_size 17
+  @padding 34
+  
+  def parse_metadata(replay) do
+    byte_size = byte_size(replay)
+    last_four_byte = binary_part(replay, byte_size - 4, 4)
+    metadata_size = :binary.decode_unsigned(last_four_byte, :little)
+    metadata = binary_part(replay, byte_size - metadata_size - 4, metadata_size)
+    Jason.decode!(metadata)
+  end
+  
+  def parse(replay) do
+    metadata = parse_metadata(replay)
+
+    rest =
+      for chunk <- 1..metadata["lastGameChunkId"], reduce: replay do
+        rest ->
+          cond do
+            chunk == 1 ->
+              <<_::binary-size(@header_size + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
+              <<_data::binary-size(size), rest::binary >> = rest
+              IO.inspect(size, label: "chunk_size #{chunk}")
+              rest
+              
+            chunk == 2 ->
+              <<tt::binary-size(@padding + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
+              <<_data::binary-size(size), rest::binary >> = rest
+              IO.inspect(size, label: "chunk_size #{chunk}")
+              rest
+              
+            true ->
+              <<_::binary-size(@chunk_header_size - 4), size::little-32, rest::binary>> = rest
+              <<_data::binary-size(size), rest::binary >> = rest
+            
+              IO.inspect(size, label: "chunk_size #{chunk}")
+              rest
+          end
+      end
+
+    # rest =
+    #   for keyframe <- 1..metadata["lastKeyFrameId"], reduce: replay do
+    #     rest ->
+    #       cond do
+    #         keyframe == 1 ->
+    #           <<_::binary-size(@padding + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
+    #           <<_data::binary-size(size), rest::binary >> = rest
+    #           IO.inspect(size, label: "keyframe_size #{keyframe}")
+    #           rest
+              
+    #         # chunk == 2 ->
+    #         #   <<tt::binary-size(@padding + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
+    #         #   <<_data::binary-size(size), rest::binary >> = rest
+    #         #   IO.inspect(size, label: "chunk_size #{chunk}")
+    #         #   rest
+              
+    #         true ->
+    #           <<_::binary-size(@chunk_header_size - 4), size::little-32, rest::binary>> = rest
+    #           <<_data::binary-size(size), rest::binary >> = rest
+            
+    #           IO.inspect(size, label: "keyframe #{keyframe}")
+    #           rest
+    #       end
+    #   end
+  end
+end
+
+W.parse(replay)
+```
+
+
+
 ## Try to find headers length v2
 
 ```elixir
@@ -58,8 +134,81 @@ game_version = binary_part(replay, 4 + 11, 14)
 ```
 
 ```elixir
-test = binary_part(replay, 4 + 11 + 14, 17)
-:binary.decode_unsigned(test, :little)
+four_byte = binary_part(replay, 29, 4)
+:binary.decode_unsigned(four_byte, :little)
+```
+
+```elixir
+four_byte = binary_part(replay, 33, 4)
+:binary.decode_unsigned(four_byte, :little)
+```
+
+```elixir
+five_byte = binary_part(replay, 37, 5)
+:binary.decode_unsigned(five_byte, :little)
+```
+
+```elixir
+four_byte = binary_part(replay, 42, 4)
+stuff_length = :binary.decode_unsigned(four_byte, :little)
+```
+
+```elixir
+stuff = binary_part(replay, 46, stuff_length)
+```
+
+```elixir
+9221 + 46
+```
+
+## part 2
+
+```elixir
+binary_slice(replay, 9267 + 4, 4)
+rest = binary_slice(replay, 9267 + 4, byte_size(replay) - 9267 + 4)
+```
+
+```elixir
+info = binary_slice(rest, 0, 47)
+```
+
+```elixir
+stuff = binary_slice(info, 43, 4)
+stuff_length = :binary.decode_unsigned(stuff, :little)
+```
+
+## Part 3
+
+```elixir
+rest = binary_slice(rest, 47, byte_size(rest) - 47)
+```
+
+```elixir
+rest = binary_slice(rest, stuff_length, byte_size(rest) - stuff_length)
+```
+
+```elixir
+info = binary_slice(rest, 0, 17)
+```
+
+```elixir
+stuff = binary_slice(info, 13, 4)
+```
+
+```elixir
+stuff_length = :binary.decode_unsigned(stuff, :little)
+```
+
+## part 4
+
+```elixir
+rest = binary_slice(rest, 17, byte_size(rest) - 17)
+rest = binary_slice(rest, stuff_length, byte_size(rest) - stuff_length)
+```
+
+```elixir
+info = binary_slice(rest, 0, 17)
+chunk_size = binary_slice(info, 13, 4) |> :binary.decode_unsigned(:little)
 ```
 
 ## Old replay
