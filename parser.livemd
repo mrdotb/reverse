@@ -7,6 +7,7 @@ Mix.install([:jason, :kino])
 ## Section
 
 ```elixir
+File.cd!("/home/mrdotb/Projects/reverse")
 File.cwd!()
 ```
 
@@ -69,9 +70,14 @@ defmodule W do
   
   def parse(replay) do
     metadata = parse_metadata(replay)
-
+    
+    byte_size = byte_size(replay)
+    last_four_byte = binary_part(replay, byte_size - 4, 4)
+    metadata_size = :binary.decode_unsigned(last_four_byte, :little)
+    rest = binary_part(replay, 0, byte_size - metadata_size - 4)
+    
     rest =
-      for chunk <- 1..metadata["lastGameChunkId"], reduce: replay do
+      for chunk <- 1..metadata["lastGameChunkId"], reduce: rest do
         rest ->
           cond do
             chunk == 1 ->
@@ -81,9 +87,10 @@ defmodule W do
               rest
               
             chunk == 2 ->
-              <<tt::binary-size(@padding + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
+              <<padded::binary-size(@padding + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
               <<_data::binary-size(size), rest::binary >> = rest
               IO.inspect(size, label: "chunk_size #{chunk}")
+              IO.inspect(padded, label: "chunk_size #{chunk}")
               rest
               
             true ->
@@ -95,37 +102,29 @@ defmodule W do
           end
       end
 
-    # rest =
-    #   for keyframe <- 1..metadata["lastKeyFrameId"], reduce: replay do
-    #     rest ->
-    #       cond do
-    #         keyframe == 1 ->
-    #           <<_::binary-size(@padding + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
-    #           <<_data::binary-size(size), rest::binary >> = rest
-    #           IO.inspect(size, label: "keyframe_size #{keyframe}")
-    #           rest
-              
-    #         # chunk == 2 ->
-    #         #   <<tt::binary-size(@padding + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
-    #         #   <<_data::binary-size(size), rest::binary >> = rest
-    #         #   IO.inspect(size, label: "chunk_size #{chunk}")
-    #         #   rest
-              
-    #         true ->
-    #           <<_::binary-size(@chunk_header_size - 4), size::little-32, rest::binary>> = rest
-    #           <<_data::binary-size(size), rest::binary >> = rest
+    # <<_::binary-size(@chunk_header_size - 4), size::little-32, rest::binary>> = rest
+    # <<_::binary-size(size), rest::binary >> = rest
+    # rest
+    rest =
+      for keyframe <- 1..metadata["lastKeyFrameId"], reduce: rest do
+        rest ->
+          cond do
+            keyframe == metadata["lastKeyFrameId"] ->
+              rest
+                
+            true ->
+              <<_::binary-size(@chunk_header_size - 4), size::little-32, rest::binary>> = rest
+              <<_data::binary-size(size), rest::binary >> = rest
             
-    #           IO.inspect(size, label: "keyframe #{keyframe}")
-    #           rest
-    #       end
-    #   end
+              IO.inspect(size, label: "keyframe #{keyframe}")
+              rest
+          end
+      end
   end
 end
 
 W.parse(replay)
 ```
-
-
 
 ## Try to find headers length v2
 
