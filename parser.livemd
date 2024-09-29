@@ -7,12 +7,13 @@ Mix.install([:jason, :kino])
 ## Section
 
 ```elixir
-File.cd!("/home/john/Projects/reverse")
+File.cd!("/home/john/Projects/reverse/7134993844-14.19")
 File.cwd!()
+File.ls!()
 ```
 
 ```elixir
-replay = File.read!("EUW1-7128452370.rofl")
+replay = File.read!("EUW1-7134993844.rofl")
 ```
 
 ## Prefix v2
@@ -82,41 +83,44 @@ defmodule W do
           cond do
             chunk == 1 ->
               <<_::binary-size(@header_size + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
-              <<_data::binary-size(size), rest::binary >> = rest
+              <<data::binary-size(size), rest::binary >> = rest
               IO.inspect(size, label: "chunk_size #{chunk}")
+              File.write!("./extract/game_data_chunks/#{chunk}", data)
               rest
               
             chunk == 2 ->
               <<padded::binary-size(@padding + @chunk_header_size - 4), size::little-32, rest::binary>> = rest
-              <<_data::binary-size(size), rest::binary >> = rest
+              <<data::binary-size(size), rest::binary >> = rest
               IO.inspect(size, label: "chunk_size #{chunk}")
               IO.inspect(padded, label: "chunk_size #{chunk}")
+              File.write!("./extract/game_data_chunks/#{chunk}", data)
               rest
               
             true ->
               <<_::binary-size(@chunk_header_size - 4), size::little-32, rest::binary>> = rest
-              <<_data::binary-size(size), rest::binary >> = rest
+              <<data::binary-size(size), rest::binary >> = rest
             
               IO.inspect(size, label: "chunk_size #{chunk}")
+              File.write!("./extract/game_data_chunks/#{chunk}", data)
               rest
           end
       end
 
-    # <<_::binary-size(@chunk_header_size - 4), size::little-32, rest::binary>> = rest
-    # <<_::binary-size(size), rest::binary >> = rest
-    # rest
     rest =
       for keyframe <- 1..metadata["lastKeyFrameId"], reduce: rest do
         rest ->
           cond do
+            # last keyframe is not prefixed with size ?
             keyframe == metadata["lastKeyFrameId"] ->
+              File.write!("./extract/key_frames/#{keyframe}", rest)
               rest
                 
             true ->
               <<_::binary-size(@chunk_header_size - 4), size::little-32, rest::binary>> = rest
-              <<_data::binary-size(size), rest::binary >> = rest
+              <<data::binary-size(size), rest::binary >> = rest
             
               IO.inspect(size, label: "keyframe #{keyframe}")
+              File.write!("./extract/key_frames/#{keyframe}", data)
               rest
           end
       end
