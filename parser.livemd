@@ -7,7 +7,7 @@ Mix.install([:jason, :kino])
 ## Section
 
 ```elixir
-File.cd!("/home/mrdotb/Projects/reverse")
+File.cd!("/home/john/Projects/reverse")
 File.cwd!()
 ```
 
